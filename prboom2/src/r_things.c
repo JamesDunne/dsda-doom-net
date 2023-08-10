@@ -665,6 +665,9 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
   fixed_t tz, tz2;
   int width;
 
+  int leftoffset;
+  fixed_t txcenter;
+
   if (thing->flags2 & MF2_DONTDRAW)
   {
     return;
@@ -706,6 +709,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
   gxt = -FixedMul(tr_x,viewsin);
   gyt = FixedMul(tr_y,viewcos);
   tx = -(gyt+gxt);
+  txcenter = tx;
 
   // too far off the side?
   if (D_abs(tx) > ((int64_t) tz << 2))
@@ -763,10 +767,11 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
      * cph 2003/08/1 - fraggle points out that this offset must be flipped
      * if the sprite is flipped; e.g. FreeDoom imp is messed up by this. */
     if (flip) {
-      tx -= (patch->width - patch->leftoffset) << FRACBITS;
+      leftoffset = patch->width - patch->leftoffset;
     } else {
-      tx -= patch->leftoffset << FRACBITS;
+      leftoffset = patch->leftoffset;
     }
+    tx -= leftoffset << FRACBITS;
     x1 = (centerxfrac + FixedMul(tx,xscale)) >> FRACBITS;
 
     tx += patch->width<<FRACBITS;
@@ -887,7 +892,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
     vis->startfrac += vis->xiscale*(vis->x1-x1);
   vis->patch = lump;
 
-  R_SetSpritelights(lightlevel);
+  R_UpdateVisSpriteTranMap(vis, thing);
 
   // get light level
   if (thing->flags & g_mf_shadow)
@@ -898,13 +903,90 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
     vis->colormap = fullcolormap;     // full bright  // killough 3/20/98
   else
     {      // diminished light
-      int index = (int)(((int64_t)xscale * 160 / wide_centerx) >> LIGHTSCALESHIFT);
-      if (index >= MAXLIGHTSCALE)
-        index = MAXLIGHTSCALE - 1;
-      vis->colormap = spritelights[index];
-    }
+      vissprite_t *vizcol;
+      subsector_t *sslast;
 
-  R_UpdateVisSpriteTranMap(vis, thing);
+      int index = (int)(((int64_t)xscale * 160 / wide_centerx) >> LIGHTSCALESHIFT);
+      if (index >= MAXLIGHTSCALE) {
+        index = MAXLIGHTSCALE - 1;
+      }
+      //R_SetSpritelights(lightlevel);
+      //vis->colormap = spritelights[index];
+
+      vizcol = vis;
+      // jsd: split sprite into horizontal spans that are divided by distinct light levels by sector
+      for (int xoff = 0; xoff < width; xoff++) {
+        fixed_t fpx;
+        fixed_t fpy;
+        subsector_t *ss;
+        int collightlevel;
+
+        tx = (xoff << FRACBITS) - (leftoffset << FRACBITS);
+        fpx = fx + FixedMul(tx, finecosine[(viewangle - ANG90)>>ANGLETOFINESHIFT]);
+        fpy = fy + FixedMul(tx, finesine[(viewangle - ANG90)>>ANGLETOFINESHIFT]);
+        ss = R_PointInSubsector(fpx, fpy);
+
+        // TODO: accommodate floor & ceiling light level
+        //floorlightlevel = P_FloorLightLevel(ss->sector);
+        //ceilinglightlevel = P_CeilingLightLevel(ss->sector);
+        //lightlevel = (floorlightlevel+ceilinglightlevel)/2;
+        collightlevel = ss->sector->lightlevel;
+
+        if (xoff == 0) {
+          // initialize first vissprite:
+          lightlevel = collightlevel;
+          sslast = ss;
+          R_SetSpritelights(collightlevel);
+          vizcol->colormap = spritelights[index];
+
+          vizcol->gx = fpx;
+          vizcol->gy = fpy;
+
+          x1 = (centerxfrac + FixedMul(txcenter + tx, xscale)) >> FRACBITS;
+          vizcol->x1 = x1 < 0 ? 0 : x1;
+          if (flip) {
+            vizcol->startfrac = (width << FRACBITS) - 1 - (xoff << FRACBITS);
+          } else {
+            vizcol->startfrac = xoff << FRACBITS;
+          }
+          if (vizcol->x1 > x1)
+            vizcol->startfrac += vis->xiscale * (vizcol->x1 - x1);
+        }
+        // extend x2 of the current vissprite:
+        x2 = (centerxfrac + FixedMul(txcenter + tx + FRACUNIT, xscale) - FRACUNIT/2) >> FRACBITS;
+        vizcol->x2 = x2 >= viewwidth ? viewwidth - 1 : x2;
+
+        // create a new vissprite?
+        if (ss != sslast) {
+          lightlevel = collightlevel;
+          sslast = ss;
+          // clone vis for next span:
+          vizcol = R_NewVisSprite();
+          memcpy(vizcol, vis, sizeof(vissprite_t));
+
+          R_SetSpritelights(collightlevel);
+          vizcol->colormap = spritelights[index];
+
+          vizcol->gx = fpx;
+          vizcol->gy = fpy;
+
+          // init x1 and startfrac:
+          x1 = (centerxfrac + FixedMul(txcenter + tx,xscale)) >> FRACBITS;
+          vizcol->x1 = x1 < 0 ? 0 : x1;
+          if (flip) {
+            vizcol->startfrac = (width<<FRACBITS)-1 - (xoff << FRACBITS);
+          } else {
+            vizcol->startfrac = xoff << FRACBITS;
+          }
+          if (vizcol->x1 > x1)
+            vizcol->startfrac += vis->xiscale*(vizcol->x1-x1);
+
+          // extend x2:
+          x2 = (centerxfrac + FixedMul(txcenter + tx + FRACUNIT, xscale) - FRACUNIT/2) >> FRACBITS;
+          vizcol->x2 = x2 >= viewwidth ? viewwidth - 1 : x2;
+        }
+      }
+    }
 }
 
 //
