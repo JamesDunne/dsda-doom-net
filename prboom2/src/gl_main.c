@@ -2135,6 +2135,10 @@ void gld_ProjectSprite(mobj_t* thing, int lightlevel)
   GLSprite sprite;
   const rpatch_t* patch;
 
+  GLDrawItemType drawItemType;
+  int width;
+  int leftoffset;
+
   int frustum_culling = HaveMouseLook();
   int mlook = HaveMouseLook() || (gl_render_fov > FOV90);
 
@@ -2225,6 +2229,7 @@ void gld_ProjectSprite(mobj_t* thing, int lightlevel)
 
   patch = R_PatchByNum(lump);
   thing->patch_width = patch->width;
+  width = patch->width;
 
   // killough 4/9/98: clip things which are out of view due to height
   if(!mlook)
@@ -2235,10 +2240,11 @@ void gld_ProjectSprite(mobj_t* thing, int lightlevel)
     * cph 2003/08/1 - fraggle points out that this offset must be flipped
     * if the sprite is flipped; e.g. FreeDoom imp is messed up by this. */
     if (flip)
-      tx -= (patch->width - patch->leftoffset) << FRACBITS;
+      leftoffset = patch->width - patch->leftoffset;
     else
-      tx -= patch->leftoffset << FRACBITS;
+      leftoffset = patch->leftoffset;
 
+    tx -= leftoffset << FRACBITS;
     x1 = (centerxfrac + FixedMul(tx, xscale)) >> FRACBITS;
     tx += patch->width << FRACBITS;
     x2 = ((centerxfrac + FixedMul (tx, xscale) - FRACUNIT/2) >> FRACBITS);
@@ -2308,14 +2314,6 @@ void gld_ProjectSprite(mobj_t* thing, int lightlevel)
   }
 
   sprite.scale = FixedDiv(projectiony, tz);;
-  if ((thing->frame & FF_FULLBRIGHT) || dsda_ShowAliveMonsters())
-  {
-    sprite.light = 1.0f;
-  }
-  else
-  {
-    sprite.light = gld_CalcLightLevel(lightlevel+gld_GetGunFlashLight());
-  }
   if (thing->color)
     sprite.cm = thing->color;
   else
@@ -2355,23 +2353,109 @@ void gld_ProjectSprite(mobj_t* thing, int lightlevel)
   else
     sprite.alpha = 1.f;
 
-  //e6y: support for transparent sprites
-  if (sprite.flags & MF_NO_DEPTH_TEST)
-  {
-    gld_AddDrawItem(GLDIT_ASPRITE, &sprite);
-  }
-  else if (sprite.alpha != 1.f || sprite.flags & (MF_SHADOW | MF_TRANSLUCENT))
-  {
-    gld_AddDrawItem(GLDIT_TSPRITE, &sprite);
-  }
-  else
-  {
-    gld_AddDrawItem(GLDIT_SPRITE, &sprite);
-  }
-
   if (dsda_ShowHealthBars())
   {
     gld_AddHealthBar(thing, &sprite);
+  }
+
+  //e6y: support for transparent sprites
+  if (sprite.flags & MF_NO_DEPTH_TEST)
+  {
+    drawItemType = GLDIT_ASPRITE;
+  }
+  else if (sprite.alpha != 1.f || sprite.flags & (MF_SHADOW | MF_TRANSLUCENT))
+  {
+    drawItemType = GLDIT_TSPRITE;
+  }
+  else
+  {
+    drawItemType = GLDIT_SPRITE;
+  }
+
+  if ((thing->frame & FF_FULLBRIGHT) || dsda_ShowAliveMonsters())
+  {
+    sprite.light = 1.0f;
+    gld_AddDrawItem(drawItemType, &sprite);
+  }
+  else
+  {
+    subsector_t *sslast;
+    float xdelta = sprite.gltexture->scalexfac / (float)width;
+
+    sprite.light = gld_CalcLightLevel(lightlevel+gld_GetGunFlashLight());
+    //gld_AddDrawItem(drawItemType, &sprite);
+
+    // jsd: split sprite into horizontal spans that are divided by distinct light levels by sector
+    for (int xoff = 1; xoff <= width; xoff++) {
+      fixed_t fpx;
+      fixed_t fpy;
+      subsector_t *ss;
+      int collightlevel;
+
+      tx = ((width-xoff) << FRACBITS) - (leftoffset << FRACBITS) - (FRACUNIT/2);
+      fpx = fx + FixedMul(tx, finecosine[(viewangle - ANG90) >> ANGLETOFINESHIFT]);
+      fpy = fy + FixedMul(tx, finesine[(viewangle - ANG90) >> ANGLETOFINESHIFT]);
+      ss = R_PointInSubsector(fpx, fpy);
+
+      // TODO: accommodate floor & ceiling light level
+      //floorlightlevel = P_FloorLightLevel(ss->sector);
+      //ceilinglightlevel = P_CeilingLightLevel(ss->sector);
+      //lightlevel = (floorlightlevel+ceilinglightlevel)/2;
+      collightlevel = ss->sector->lightlevel;
+
+      if (xoff == 1) {
+        sslast = ss;
+        sprite.fx = fpx;
+        sprite.fy = fpy;
+        sprite.light = gld_CalcLightLevel(collightlevel+gld_GetGunFlashLight());
+
+#if 1
+        sprite.x1 = ((float)patch->leftoffset / MAP_COEFF) - ((float)patch->width / MAP_COEFF);
+        sprite.x2 = sprite.x1;
+#else
+        sprite.x2 = (float)patch->leftoffset / MAP_COEFF;
+        sprite.x1 = sprite.x2;
+#endif
+
+        if (flip) {
+          sprite.ul = 0.0f;
+          sprite.ur = 0.0f;
+        } else {
+          sprite.ul = sprite.gltexture->scalexfac;
+          sprite.ur = sprite.gltexture->scalexfac;
+        }
+      }
+
+#if 1
+      sprite.x2 += 1.0f / MAP_COEFF;
+#else
+      sprite.x1 -= 1.0f / MAP_COEFF;
+#endif
+      if (flip) {
+        sprite.ur += xdelta;
+      } else {
+        sprite.ur -= xdelta;
+      }
+
+      if (ss != sslast || xoff == width) {
+        sslast = ss;
+
+        // add last span to be drawn:
+        gld_AddDrawItem(drawItemType, &sprite);
+
+        // create new span:
+        sprite.fx = fpx;
+        sprite.fy = fpy;
+        sprite.light = gld_CalcLightLevel(collightlevel+gld_GetGunFlashLight());
+
+#if 1
+        sprite.x1 = sprite.x2;
+#else
+        sprite.x2 = sprite.x1;
+#endif
+        sprite.ul = sprite.ur;
+      }
+    }
   }
 }
 
