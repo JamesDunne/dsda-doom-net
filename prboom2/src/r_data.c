@@ -406,17 +406,30 @@ static void R_InitColormaps(void)
 
   // jsd: build light-amp goggle colormaps:
   {
-    int i, j, z;
+    int i, j, m;
 
     const unsigned char *playpal = V_GetPlaypal();
 
     for (i = 0; i < numcolormaps; i++) {
       lighttable_t *gmap = (lighttable_t *) Z_Malloc(NUMCOLORMAPS * 256 * sizeof(lighttable_t));
-      for (z = 0; z < NUMCOLORMAPS; z++) {
+      for (m = 0; m < NUMCOLORMAPS; m++) {
         for (j = 0; j < 256; j++) {
-          lighttable_t c = colormaps[i][ (z*7/8+2)*256 + j];
-          // find a lighter color in playpal:
-          gmap[z*256+j] = dsda_PaletteFindLighterColor(playpal, c, (M_Random()-127.0)/40.0+14.5, 2.55, 231.0);
+          double cL, ca, cb;
+          double x, y, z;
+          lighttable_t c;
+
+          // look up color in colormap:
+          c = colormaps[i][(m * 5 / 6 + 1) * 256 + j];
+          // convert the RGB to Lab colorspace:
+          dsda_PaletteGetColorLab(playpal, c, &cL, &ca, &cb);
+          // lighten the color and apply gamma ramp:
+          cL = pow((cL + 25.0), 2.65) / 373.0;
+          // green tint:
+          ca = -200.0;
+          cb = 56.0;
+          dsda_ColorLabToXYZ(cL, ca, cb, &x, &y, &z);
+          // find the nearest color in playpal:
+          gmap[m*256+j] = dsda_PaletteFindNearestXYZColor(playpal, x, y, z);
         }
       }
       gogglemaps[i] = (const lighttable_t *) gmap;

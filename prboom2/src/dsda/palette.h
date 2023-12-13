@@ -51,7 +51,12 @@ typedef struct playpal_data_s {
 } dsda_playpal_t;
 
 double dsda_PaletteEntryLightness(const char *playpal, int i);
-int dsda_PaletteFindLighterColor(const char *playpal, int i, double addL, double gammaL, double divL);
+void dsda_ColorLabToXYZ(double cL, double ca, double cb, double *x, double *y, double *z);
+void dsda_ColorXYZtoLab(double x1, double y1, double z1, double *cL, double *ca, double *cb);
+void dsda_PaletteGetColorLab(const char *playpal, int i, double *cL, double *ca, double *cb);
+double dsda_XYZDistanceSquared(double x1, double y1, double z1, double x2, double y2, double z2);
+void dsda_PaletteGetColorXYZ(const char *playpal, int i, double *x1, double *y1, double *z1);
+int dsda_PaletteFindNearestXYZColor(const char *playpal, double x, double y, double z);
 dsda_playpal_t* dsda_PlayPalData(void);
 void dsda_CyclePlayPal(void);
 void dsda_SetPlayPal(int index);
