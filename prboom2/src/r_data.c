@@ -43,11 +43,14 @@
 #include "p_tick.h"
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "p_tick.h"
+#include "v_video.h"
 
 #include "dsda/args.h"
 #include "dsda/configuration.h"
 #include "dsda/map_format.h"
 #include "dsda/utility.h"
+#include "dsda/palette.h"
+#include "m_random.h"
 
 //
 // Graphics.
@@ -397,6 +400,28 @@ static void R_InitColormaps(void)
   for (i=1; i<numcolormaps; i++)
     colormaps[i] = (const lighttable_t *)W_LumpByNum(i+firstcolormaplump);
   // cph - always lock
+
+  // jsd: allocate gogglemaps here but fill them in R_InitPatches after PLAYPAL palette loaded:
+  gogglemaps = Z_Malloc(sizeof(*gogglemaps) * numcolormaps);
+
+  // jsd: build light-amp goggle colormaps:
+  {
+    int i, j, z;
+
+    const unsigned char *playpal = V_GetPlaypal();
+
+    for (i = 0; i < numcolormaps; i++) {
+      lighttable_t *gmap = (lighttable_t *) Z_Malloc(NUMCOLORMAPS * 256 * sizeof(lighttable_t));
+      for (z = 0; z < NUMCOLORMAPS; z++) {
+        for (j = 0; j < 256; j++) {
+          lighttable_t c = colormaps[i][ (z*7/8+2)*256 + j];
+          // find a lighter color in playpal:
+          gmap[z*256+j] = dsda_PaletteFindLighterColor(playpal, c, (M_Random()-127.0)/40.0+14.5, 2.55, 231.0);
+        }
+      }
+      gogglemaps[i] = (const lighttable_t *) gmap;
+    }
+  }
 }
 
 // killough 4/4/98: get colormap number from name

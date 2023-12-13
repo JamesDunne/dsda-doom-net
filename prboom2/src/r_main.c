@@ -146,11 +146,14 @@ angle_t *xtoviewangle;   // killough 2/8/98
 
 int numcolormaps;
 const lighttable_t *(*c_scalelight)[LIGHTLEVELS_MAX][MAXLIGHTSCALE];
+const lighttable_t *(*c_scalelightgoggles)[LIGHTLEVELS_MAX][MAXLIGHTSCALE];
 const lighttable_t *(*c_zlight)[LIGHTLEVELS_MAX][MAXLIGHTZ];
+const lighttable_t *(*c_zlightgoggles)[LIGHTLEVELS_MAX][MAXLIGHTZ];
 const lighttable_t *(*scalelight)[MAXLIGHTSCALE];
 const lighttable_t *(*zlight)[MAXLIGHTZ];
 const lighttable_t *fullcolormap;
 const lighttable_t **colormaps;
+const lighttable_t **gogglemaps;
 
 // killough 3/20/98, 4/4/98: end dynamic colormaps
 
@@ -443,7 +446,9 @@ static void R_InitLightTables (void)
 
   // killough 4/4/98: dynamic colormaps
   c_zlight = Z_Malloc(sizeof(*c_zlight) * numcolormaps);
+  c_zlightgoggles = Z_Malloc(sizeof(*c_zlightgoggles) * numcolormaps);
   c_scalelight = Z_Malloc(sizeof(*c_scalelight) * numcolormaps);
+  c_scalelightgoggles = Z_Malloc(sizeof(*c_scalelightgoggles) * numcolormaps);
 
   // hexen_note: does hexen require render_doom_lightmaps?
   render_doom_lightmaps = dsda_IntConfig(dsda_config_render_doom_lightmaps);
@@ -475,8 +480,10 @@ static void R_InitLightTables (void)
 
           // killough 3/20/98: Initialize multiple colormaps
           level *= 256;
-          for (t=0; t<numcolormaps; t++)         // killough 4/4/98
+          for (t=0; t<numcolormaps; t++) {        // killough 4/4/98
             c_zlight[t][i][j] = colormaps[t] + level;
+            c_zlightgoggles[t][i][j] = gogglemaps[t] + level;
+          }
         }
     }
 }
@@ -633,6 +640,12 @@ void R_BuildModelViewMatrix(void)
 // R_ExecuteSetViewSize
 //
 
+const lighttable_t *dsda_GenerateLightAmpColormap(int t, int i, int j) {
+  lighttable_t *cmap = (lighttable_t *) Z_Malloc(256*sizeof(lighttable_t));
+  colormaps[t] + i;
+  return cmap;
+}
+
 void R_ExecuteSetViewSize (void)
 {
   int i;
@@ -743,8 +756,10 @@ void R_ExecuteSetViewSize (void)
       // killough 3/20/98: initialize multiple colormaps
       level *= 256;
 
-      for (t=0; t<numcolormaps; t++)     // killough 4/4/98
+      for (t=0; t<numcolormaps; t++) {   // killough 4/4/98
         c_scalelight[t][i][j] = colormaps[t] + level;
+        c_scalelightgoggles[t][i][j] = gogglemaps[t] + level;
+      }
     }
   }
 
@@ -910,7 +925,14 @@ static void R_SetupFrame (player_t *player)
     I_Error("<fixedcolormap> value out of range: %d\n", player->fixedcolormap);
   }
 
-  if (player->fixedcolormap)
+  if (player->fixedcolormap == 1)
+    {
+      // jsd: light amp goggles are on
+      fullcolormap = gogglemaps[cm];
+      zlight = c_zlightgoggles[cm];
+      scalelight = c_scalelightgoggles[cm];
+    }
+  else if (player->fixedcolormap)
     {
       // killough 3/20/98: localize scalelightfixed (readability/optimization)
       static const lighttable_t *scalelightfixed[MAXLIGHTSCALE];
