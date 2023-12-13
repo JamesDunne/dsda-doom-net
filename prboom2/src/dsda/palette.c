@@ -140,73 +140,10 @@ double dsda_PaletteEntryLightness(const char *playpal, int i) {
   return L;
 }
 
-// finds the squared distance between x2,y2,z2 and the RGB color at palette index i converted to XYZ
-double dsda_PaletteXYZDistanceSquared(const char *playpal, int i, double x2, double y2, double z2) {
-  byte pal_r, pal_g, pal_b;
-  double r, g, b;
-  double x1;
-  double y1;
-  double z1;
-
-  // step 0: get colors from palette -- explicitly get it as a byte
-  // (i.e. unsigned) so it doesn't get interpreted as a negative value.
-  pal_r = playpal[3 * i + 0];
-  pal_g = playpal[3 * i + 1];
-  pal_b = playpal[3 * i + 2];
-
-  // step 1: RGB to XYZ
-  r = pal_r / 255.0;
-  g = pal_g / 255.0;
-  b = pal_b / 255.0;
-
-  r = r > 0.04045 ? pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-  g = g > 0.04045 ? pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-  b = b > 0.04045 ? pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-
-  r *= 100;
-  g *= 100;
-  b *= 100;
-
-  x1 = 0.4124 * r + 0.3576 * g + 0.1805 * b;
-  y1 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  z1 = 0.0193 * r + 0.1192 * g + 0.9505 * b;
-
-  return (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) + (z2-z1)*(z2-z1);
-}
-
-int dsda_PaletteFindLighterColor(const char *playpal, int i, double addL, double gammaL, double divL) {
-  double cL, ca, cb;
-  byte pal_r, pal_g, pal_b;
-  double r, g, b;
-  double x1, x2;
-  double y1, y2;
-  double z1, z2;
-  double x2_3;
-  double y2_3;
-  double z2_3;
-
-  // step 0: get colors from palette -- explicitly get it as a byte
-  // (i.e. unsigned) so it doesn't get interpreted as a negative value.
-  pal_r = playpal[3 * i + 0];
-  pal_g = playpal[3 * i + 1];
-  pal_b = playpal[3 * i + 2];
-
-  // step 1: RGB to XYZ
-  r = pal_r / 255.0;
-  g = pal_g / 255.0;
-  b = pal_b / 255.0;
-
-  r = r > 0.04045 ? pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-  g = g > 0.04045 ? pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-  b = b > 0.04045 ? pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-
-  r *= 100;
-  g *= 100;
-  b *= 100;
-
-  x1 = 0.4124 * r + 0.3576 * g + 0.1805 * b;
-  y1 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  z1 = 0.0193 * r + 0.1192 * g + 0.9505 * b;
+void dsda_ColorXYZtoLab(double x1, double y1, double z1, double *cL, double *ca, double *cb) {
+  double x2;
+  double y2;
+  double z2;
 
   // step 2: XYZ to Lab
   x2 = x1 / 100.0;
@@ -218,46 +155,99 @@ int dsda_PaletteFindLighterColor(const char *playpal, int i, double addL, double
   z2 = z1 / 100.0;
   z2 = z2 > 0.008856 ? pow(z2, 1.0 / 3) : 7.787 * z2 + 4.0 / 29;
 
-  cL = 116.0 * y2 - 16.0;
-  ca = 500.0 * (x2 - y2);
-  cb = 200.0 * (y2 - z2);
+  *cL = 116.0 * y2 - 16.0;
+  *ca = 500.0 * (x2 - y2);
+  *cb = 200.0 * (y2 - z2);
+}
 
-  // adjust lightness:
-  cL = pow(cL + addL, gammaL) / divL;
+void dsda_ColorLabToXYZ(double cL, double ca, double cb, double *x, double *y, double *z) {
+  double x_3;
+  double y_3;
+  double z_3;
+  double tx;
+  double ty;
+  double tz;
 
   // convert L*ab to XYZ:
-  y2 = (cL + 16.0) / 116.0;
-  x2 = ca / 500.0 + y2;
-  z2 = y2 - cb / 200.0;
+  ty = (cL + 16.0) / 116.0;
+  tx = ca / 500.0 + ty;
+  tz = ty - cb / 200.0;
 
-  x2_3 = pow(x2, 3.0);
-  x2 = (x2_3 > 0.008856) ? x2_3 : (x2 - 16.0 / 116.0) / 7.787;
-  y2_3 = pow(y2, 3.0);
-  y2 = (y2_3 > 0.008856) ? y2_3 : (y2 - 16.0 / 116.0) / 7.787;
-  z2_3 = pow(z2, 3.0);
-  z2 = (z2_3 > 0.008856) ? z2_3 : (z2 - 16.0 / 116.0) / 7.787;
+  x_3 = pow(tx, 3.0);
+  tx = (x_3 > 0.008856) ? x_3 : (tx - 16.0 / 116.0) / 7.787;
+  y_3 = pow(ty, 3.0);
+  ty = (y_3 > 0.008856) ? y_3 : (ty - 16.0 / 116.0) / 7.787;
+  z_3 = pow(tz, 3.0);
+  tz = (z_3 > 0.008856) ? z_3 : (tz - 16.0 / 116.0) / 7.787;
 
-  x2 *= 100.0;
-  y2 *= 100.0;
-  z2 *= 100.0;
+  *x = tx * 100.0;
+  *y = ty * 100.0;
+  *z = tz * 100.0;
+}
 
+void dsda_PaletteGetColorXYZ(const char *playpal, int i, double *x1, double *y1, double *z1) {
+  byte pal_r, pal_g, pal_b;
+  double r, g, b;
+
+  // step 0: get colors from palette -- explicitly get it as a byte
+  // (i.e. unsigned) so it doesn't get interpreted as a negative value.
+  pal_r = playpal[3 * i + 0];
+  pal_g = playpal[3 * i + 1];
+  pal_b = playpal[3 * i + 2];
+
+  // step 1: RGB to XYZ
+  r = pal_r / 255.0;
+  g = pal_g / 255.0;
+  b = pal_b / 255.0;
+
+  r = r > 0.04045 ? pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+  g = g > 0.04045 ? pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+  b = b > 0.04045 ? pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+  r *= 100;
+  g *= 100;
+  b *= 100;
+
+  *x1 = 0.4124 * r + 0.3576 * g + 0.1805 * b;
+  *y1 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  *z1 = 0.0193 * r + 0.1192 * g + 0.9505 * b;
+}
+
+// finds the squared distance between x2,y2,z2 and the RGB color at palette index i converted to XYZ
+double dsda_XYZDistanceSquared(double x1, double y1, double z1, double x2, double y2, double z2) {
+  return (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) + (z2-z1)*(z2-z1);
+}
+
+void dsda_PaletteGetColorLab(const char *playpal, int i, double *cL, double *ca, double *cb) {
+  double x1;
+  double y1;
+  double z1;
+
+  dsda_PaletteGetColorXYZ(playpal, i, &x1, &y1, &z1);
+
+  dsda_ColorXYZtoLab(x1, y1, z1, cL, ca, cb);
+}
+
+int dsda_PaletteFindNearestXYZColor(const char *playpal, double x, double y, double z) {
   // find color nearest to (x,y,z) in playpal:
   double mindist = 1e307;
   int nearest = -1;
   for (int j = 0; j < 256; j++) {
-    double dist = dsda_PaletteXYZDistanceSquared(playpal, j, x2, y2, z2);
+    double x1;
+    double y1;
+    double z1;
+
+    dsda_PaletteGetColorXYZ(playpal, j, &x1, &y1, &z1);
+
+    double dist = dsda_XYZDistanceSquared(x1, y1, z1, x, y, z);
     if (dist < mindist) {
       mindist = dist;
       nearest = j;
     }
   }
 
-  // found a lighter color:
-  if (nearest >= 0) {
-    return nearest;
-  }
-
-  return i;
+  // found the closest color:
+  return nearest;
 }
 
 // Moved from r_patch.c
