@@ -931,6 +931,7 @@ static void R_SetupFrame (player_t *player)
       fullcolormap = gogglemaps[cm];
       zlight = c_zlightgoggles[cm];
       scalelight = c_scalelightgoggles[cm];
+      frame_fixedcolormap = 0;
     }
   else if (player->fixedcolormap)
     {

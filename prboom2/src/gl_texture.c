@@ -549,7 +549,6 @@ static void gld_AddColormapToTexture(GLTexture *gltexture, unsigned char *buffer
 {
   int x,y,pos;
   const unsigned char *playpal;
-  const lighttable_t *colormap;
   const byte * gtable;
   int gtlump;
 
@@ -561,13 +560,13 @@ static void gld_AddColormapToTexture(GLTexture *gltexture, unsigned char *buffer
   // figure out which palette variant to use
   // (e.g. normal, pain flash, item flash, etc).
   playpal = V_GetPlaypal() + (palette_index*PALETTE_SIZE);
-  colormap = fullcolormap;
+  gltexture->colormap = fullcolormap;
 
   // fallback in case the current colormap hasn't been set
   // yet; this occurs when rendering the main menu for the
   // first time if the game is launched in indexed lightmode
-  if (colormap == NULL)
-    colormap = colormaps[0];
+  if (gltexture->colormap == NULL)
+    gltexture->colormap = colormaps[0];
 
   // also yoink the gamma table and apply
   // software gamma emulation to the texture.
@@ -602,9 +601,9 @@ static void gld_AddColormapToTexture(GLTexture *gltexture, unsigned char *buffer
       }
       else
       {
-        buffer[pos+0]=gtable[playpal[colormap[y*256+x]*3+0]];
-        buffer[pos+1]=gtable[playpal[colormap[y*256+x]*3+1]];
-        buffer[pos+2]=gtable[playpal[colormap[y*256+x]*3+2]];
+        buffer[pos+0]=gtable[playpal[gltexture->colormap[y*256+x]*3+0]];
+        buffer[pos+1]=gtable[playpal[gltexture->colormap[y*256+x]*3+1]];
+        buffer[pos+2]=gtable[playpal[gltexture->colormap[y*256+x]*3+2]];
         buffer[pos+3]=255;
       }
     }
@@ -1275,7 +1274,7 @@ void gld_BindColormapTexture(GLTexture *gltexture, int palette_index, int gamma_
   last_glTexID = gltexture->texid_p;
 
   // texure data already initialized; use it
-  if (*gltexture->texid_p != 0)
+  if (*gltexture->texid_p != 0 && gltexture->colormap == fullcolormap)
   {
     glBindTexture(GL_TEXTURE_2D, *gltexture->texid_p);
     GLEXT_glActiveTextureARB(GL_TEXTURE0_ARB);

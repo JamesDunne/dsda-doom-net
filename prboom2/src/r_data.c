@@ -411,8 +411,8 @@ static void R_InitColormaps(void)
     const unsigned char *playpal = V_GetPlaypal();
 
     for (i = 0; i < numcolormaps; i++) {
-      lighttable_t *gmap = (lighttable_t *) Z_Malloc(NUMCOLORMAPS * 256 * sizeof(lighttable_t));
-      for (m = 0; m < NUMCOLORMAPS; m++) {
+      lighttable_t *gmap = (lighttable_t *) Z_Malloc((NUMCOLORMAPS+1) * 256 * sizeof(lighttable_t));
+      for (m = 0; m < NUMCOLORMAPS+1; m++) {
         for (j = 0; j < 256; j++) {
           double cL, ca, cb;
           double x, y, z;

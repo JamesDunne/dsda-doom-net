@@ -108,6 +108,7 @@ typedef struct
 
   int cm;
   int player_cm;
+  const lighttable_t *colormap;
 
   GLTexType textype;
   unsigned int flags;
