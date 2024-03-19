@@ -370,6 +370,42 @@ static void R_InitSpriteLumps(void)
   numspritelumps = lastspritelump - firstspritelump + 1;
 }
 
+void R_InitGoggleMaps(void) {
+  int i, j, m;
+
+  // jsd: allocate gogglemaps here but fill them in R_InitPatches after PLAYPAL palette loaded:
+  gogglemaps = Z_Malloc(sizeof(*gogglemaps) * numcolormaps);
+
+  // jsd: build light-amp goggle colormaps:
+  const unsigned char *playpal = V_GetPlaypal();
+
+  for (i = 0; i < numcolormaps; i++) {
+    lighttable_t *gmap = (lighttable_t *) Z_Malloc((NUMCOLORMAPS + 1) * 256 * sizeof(lighttable_t));
+    for (m = 0; m < NUMCOLORMAPS + 1; m++) {
+      for (j = 0; j < 256; j++) {
+        double cL, ca, cb;
+        double x, y, z;
+        lighttable_t c;
+
+        // look up color in colormap:
+        c = colormaps[i][m * 256 + j];
+        // convert the RGB to Lab colorspace:
+        dsda_PaletteGetColorLab(playpal, c, &cL, &ca, &cb);
+
+        // lighten the color and apply gamma ramp:
+        cL = (log(1.0+cL)*goggles_cL_mul) + goggles_cL_add;
+        // green tint:
+        ca = (ca * goggles_ca_mul) + goggles_ca_add;
+        cb = (cb * goggles_cb_mul) + goggles_cb_add;
+        // find the nearest color in playpal:
+        dsda_ColorLabToXYZ(cL, ca, cb, &x, &y, &z);
+        gmap[m * 256 + j] = dsda_PaletteFindNearestXYZColor(playpal, x, y, z);
+      }
+    }
+    gogglemaps[i] = (const lighttable_t *) gmap;
+  }
+}
+
 //
 // R_InitColormaps
 //
@@ -379,62 +415,25 @@ static void R_InitSpriteLumps(void)
 // killough 4/4/98: Add support for C_START/C_END markers
 //
 
-static void R_InitColormaps(void)
-{
+static void R_InitColormaps(void) {
   int i;
   // MAP_FORMAT_TODO: not sure about this
-  if (hexen)
-  {
+  if (hexen) {
     firstcolormaplump = -1;
     lastcolormaplump = -1;
     numcolormaps = 1;
-  }
-  else
-  {
+  } else {
     firstcolormaplump = W_GetNumForName("C_START");
-    lastcolormaplump  = W_GetNumForName("C_END");
+    lastcolormaplump = W_GetNumForName("C_END");
     numcolormaps = lastcolormaplump - firstcolormaplump;
   }
   colormaps = Z_Malloc(sizeof(*colormaps) * numcolormaps);
-  colormaps[0] = (const lighttable_t *)W_LumpByName("COLORMAP");
-  for (i=1; i<numcolormaps; i++)
-    colormaps[i] = (const lighttable_t *)W_LumpByNum(i+firstcolormaplump);
+  colormaps[0] = (const lighttable_t *) W_LumpByName("COLORMAP");
+  for (i = 1; i < numcolormaps; i++)
+    colormaps[i] = (const lighttable_t *) W_LumpByNum(i + firstcolormaplump);
   // cph - always lock
 
-  // jsd: allocate gogglemaps here but fill them in R_InitPatches after PLAYPAL palette loaded:
-  gogglemaps = Z_Malloc(sizeof(*gogglemaps) * numcolormaps);
-
-  // jsd: build light-amp goggle colormaps:
-  {
-    int i, j, m;
-
-    const unsigned char *playpal = V_GetPlaypal();
-
-    for (i = 0; i < numcolormaps; i++) {
-      lighttable_t *gmap = (lighttable_t *) Z_Malloc((NUMCOLORMAPS+1) * 256 * sizeof(lighttable_t));
-      for (m = 0; m < NUMCOLORMAPS+1; m++) {
-        for (j = 0; j < 256; j++) {
-          double cL, ca, cb;
-          double x, y, z;
-          lighttable_t c;
-
-          // look up color in colormap:
-          c = colormaps[i][(m * 5 / 6 + 1) * 256 + j];
-          // convert the RGB to Lab colorspace:
-          dsda_PaletteGetColorLab(playpal, c, &cL, &ca, &cb);
-          // lighten the color and apply gamma ramp:
-          cL = pow((cL + 25.0), 2.65) / 373.0;
-          // green tint:
-          ca = -200.0;
-          cb = 56.0;
-          dsda_ColorLabToXYZ(cL, ca, cb, &x, &y, &z);
-          // find the nearest color in playpal:
-          gmap[m*256+j] = dsda_PaletteFindNearestXYZColor(playpal, x, y, z);
-        }
-      }
-      gogglemaps[i] = (const lighttable_t *) gmap;
-    }
-  }
+  R_InitGoggleMaps();
 }
 
 // killough 4/4/98: get colormap number from name

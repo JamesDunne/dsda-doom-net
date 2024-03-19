@@ -153,9 +153,13 @@ const lighttable_t *(*scalelight)[MAXLIGHTSCALE];
 const lighttable_t *(*zlight)[MAXLIGHTZ];
 const lighttable_t *fullcolormap;
 const lighttable_t **colormaps;
-const lighttable_t **gogglemaps;
-
 // killough 3/20/98, 4/4/98: end dynamic colormaps
+
+const lighttable_t **gogglemaps;
+double goggles_cL_mul = 30.0, goggles_cL_add = 2.0;
+double goggles_ca_mul = 0.2, goggles_ca_add = -160.0;
+double goggles_cb_mul = 0.2, goggles_cb_add = 56.0;
+
 
 //e6y: for Boom colormaps in OpenGL mode
 dboolean use_boom_cm;

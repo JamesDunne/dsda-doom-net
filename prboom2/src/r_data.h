@@ -77,6 +77,7 @@ const byte *R_GetTextureColumn(const rpatch_t *texpatch, int col);
 void R_InitData (void);
 void R_PrecacheLevel (void);
 
+void R_InitGoggleMaps (void);
 
 // Retrieval.
 // Floor/ceiling opaque texture tiles,

@@ -35,6 +35,7 @@
 #include "p_spec.h"
 #include "p_tick.h"
 #include "p_user.h"
+#include "r_main.h"
 #include "s_sound.h"
 #include "smooth.h"
 #include "v_video.h"
@@ -1044,6 +1045,32 @@ static dboolean console_Exit(const char* command, const char* args) {
 
   M_ClearMenus();
 
+  return true;
+}
+
+static dboolean getOrSet(const char *name, double *var, const char *newValue) {
+  dboolean assigned = false;
+  if (strlen(newValue) > 0) {
+    *var = strtod(newValue, NULL);
+    assigned = true;
+  }
+  lprintf(LO_INFO, "%s = %lf\n", name, *var);
+  return assigned;
+}
+
+static dboolean console_GogglesSet(const char* command, const char* args) {
+  dboolean assigned = false;
+       if (stricmp(command, "goggles.cL.mul") == 0) { assigned = getOrSet("cL_mul", &goggles_cL_mul, args); }
+  else if (stricmp(command, "goggles.cL.add") == 0) { assigned = getOrSet("cL_add", &goggles_cL_add, args); }
+  else if (stricmp(command, "goggles.ca.mul") == 0) { assigned = getOrSet("ca_mul", &goggles_ca_mul, args); }
+  else if (stricmp(command, "goggles.ca.add") == 0) { assigned = getOrSet("ca_add", &goggles_ca_add, args); }
+  else if (stricmp(command, "goggles.cb.mul") == 0) { assigned = getOrSet("cb_mul", &goggles_cb_mul, args); }
+  else if (stricmp(command, "goggles.cb.add") == 0) { assigned = getOrSet("cb_add", &goggles_cb_add, args); }
+  else return false;
+
+  if (assigned) {
+    R_InitGoggleMaps();
+  }
   return true;
 }
 
@@ -2480,18 +2507,26 @@ static console_command_entry_t console_commands[] = {
   { "nra", console_BasicCheat, CF_DEMO },
   { "indiana", console_BasicCheat, CF_DEMO },
   { "locksmith", console_BasicCheat, CF_DEMO },
-  { "sherlock", console_BasicCheat, CF_DEMO },
-  { "casper", console_BasicCheat, CF_DEMO },
-  { "init", console_BasicCheat, CF_DEMO },
-  { "mapsco", console_IDDT, CF_DEMO },
-  { "deliverance", console_BasicCheat, CF_DEMO },
-  { "shadowcaster", console_BasicCheat, CF_DEMO },
-  { "visit", console_BasicCheat, CF_DEMO },
-  { "puke", console_BasicCheat, CF_DEMO },
+  { "sherlock",       console_BasicCheat, CF_DEMO },
+  { "casper",         console_BasicCheat, CF_DEMO },
+  { "init",           console_BasicCheat, CF_DEMO },
+  { "mapsco",         console_IDDT,       CF_DEMO },
+  { "deliverance",    console_BasicCheat, CF_DEMO },
+  { "shadowcaster",   console_BasicCheat, CF_DEMO },
+  { "visit",          console_BasicCheat, CF_DEMO },
+  { "puke",           console_BasicCheat, CF_DEMO },
+
+  // jsd: light-amp goggle parameters:
+  { "goggles.cL.mul", console_GogglesSet, CF_ALWAYS },
+  { "goggles.cL.add", console_GogglesSet, CF_ALWAYS },
+  { "goggles.ca.mul", console_GogglesSet, CF_ALWAYS },
+  { "goggles.ca.add", console_GogglesSet, CF_ALWAYS },
+  { "goggles.cb.mul", console_GogglesSet, CF_ALWAYS },
+  { "goggles.cb.add", console_GogglesSet, CF_ALWAYS },
 
   // exit
-  { "exit", console_Exit, CF_ALWAYS },
-  { "quit", console_Exit, CF_ALWAYS },
+  { "exit",           console_Exit,       CF_ALWAYS },
+  { "quit",           console_Exit,       CF_ALWAYS },
   { NULL }
 };
 
